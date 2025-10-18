@@ -63,18 +63,12 @@ class Block_Shapes:
         self.current_shape = 0
     def get_rel_pos(self):
         return self.rel_pos[self.current_shape]
-    def rotate_clock(self):
-        if self.current_shape != self.rot_amount:
-
-            self.current_shape += 1
-        else:
-            self.current_shape = 0
-    def rotate_anticlock(self):
-        if self.current_shape != 0:
-
-            self.current_shape -= 1
-        else:
-            self.current_shape = self.rot_amount - 1
+    
+    def calculate_pos_list(self,abs_pos):
+        cell_pos = []
+        for pos in self.rel_pos[self.current_shape]:
+            cell_pos.append(sum_tuple(abs_pos,pos))
+        return cell_pos
 
 
 shapes_list = [Block_Shapes([[(0,0),(1,0),(0,1),(1,1)]]),#2x2 block
@@ -82,8 +76,8 @@ shapes_list = [Block_Shapes([[(0,0),(1,0),(0,1),(1,1)]]),#2x2 block
                Block_Shapes([[(0,-1),(0,0),(0,1),(1,0)],[(-1,0),(0,0),(0,1),(1,0)],[(0,-1),(0,0),(0,1),(-1,0)],[(-1,0),(0,0),(0,-1),(1,0)]]), #flat T block
                Block_Shapes([[(0,-1),(0,0),(0,1),(1,1)],[(1,0),(0,0),(-1,0),(-1,1)],[(-1,-1),(0,-1),(0,0),(0,1)],[(1,-1),(1,0),(0,0),(-1,0)]]), #L shape
                Block_Shapes([[(0,-1),(0,0),(0,1),(-1,1)],[(1,0),(0,0),(-1,0),(-1,-1)],[(1,-1),(0,-1),(0,0),(0,1)],[(1,1),(1,0),(0,0),(-1,0)]]), # reverse L Shape 
-               Block_Shapes([[(-1,0),(0,0),(0,-1),(1,-1)],[(1,-1),(1,0),(0,0),(0,1)]]), # Stair (l->r)  _/-
-               Block_Shapes([[(-1,-1),(0,-1),(0,0),(1,0)],[(0,-1),(0,0),(1,0),(1,1)]]), # Stair (r->l) -\_
+               Block_Shapes([[(-1,-1),(0,-1),(0,0),(1,0)],[(0,-1),(0,0),(-1,0),(-1,1)]]), # Stair (l->r)  _/-
+               Block_Shapes([[(-1,0),(0,0),(0,-1),(1,-1)],[(1,1),(1,0),(0,0),(0,-1)]]), # Stair (r->l) -\_
                ]
 
 class Block:
@@ -94,15 +88,48 @@ class Block:
         self.gravity = (0,1)
         self.locking_next_step = False
     
+
     def colliding_after_grav(self,colliders_list):
         next_pos = sum_tuple(self.pos,self.gravity)
         for collider in colliders_list:
             for rel_pos in self.shape.get_rel_pos():
-                if compare_tuple(sum_tuple(rel_pos,next_pos),collider):
+                if compare_tuple(sum_tuple(rel_pos,next_pos),collider) or sum_tuple(next_pos,rel_pos)[1] == 18:
+
                     return True
         
         return False
+    def collide_after_vect(self,vect,colliders_list):
+        next_pos = sum_tuple(self.pos,vect)
+        for collider in colliders_list:
+            for rel_pos in self.shape.get_rel_pos():
+                summed_next_pos = sum_tuple(rel_pos,next_pos)
+                if compare_tuple(summed_next_pos,collider) or summed_next_pos[0] == -1 or summed_next_pos[0] == 8:
+                    return True
+        return False
+    
+    def move_left(self,col_list):
+        if not self.collide_after_vect((-1,0),col_list):
+            self.pos = sum_tuple(self.pos,(-1,0))
+            self.locking_next_step = False
+    
+    
+    def move_right(self,col_list):
+        if not self.collide_after_vect((1,0),col_list):
+            self.pos = sum_tuple(self.pos,(1,0))
+            self.locking_next_step = False
+    def rotate_clock(self):
+        if self.shape.current_shape != self.shape.rot_amount-1:
+            self.locking_next_step = False
+            self.shape.current_shape += 1
+        else:
+            self.shape.current_shape = 0
+    def rotate_anticlock(self):
+        if self.shape.current_shape != 0:
+            self.locking_next_step = False
 
+            self.shape.current_shape -= 1
+        else:
+            self.shape.current_shape = self.shape.rot_amount - 1
 
     def grav(self,col_list):
         #check for collisions:
@@ -125,6 +152,7 @@ class Game:
         self.locked_blocks = []
         self.score = 0
         self.lines = 0
+        self.level = 1
         self.current_falling: Block
         self.next_block = self.generate_block()
     
@@ -133,9 +161,11 @@ class Game:
             self.falling_to_static(self.current_falling)
             self.current_falling = self.next_block
             self.next_block = self.generate_block()
+            self.remove_lines()
         else:
 
             self.current_falling.grav(self.locked_blocks)
+            
 
     def generate_block(self):
         return Block((random.randint(2,5),2),random.choice(shapes_list))
@@ -187,7 +217,16 @@ class Game:
         
         self.locked_blocks = sort_pos(self.locked_blocks)
         
-
+    def update_score(self,line_amount):
+        match line_amount:
+            case 1:
+                self.score += 100 * (1.5**(self.level-1))
+            case 2:
+                self.score += 300 * (1.5**(self.level-1))
+            case 3:
+                self.score += 1000 * (1.5**(self.level-1))
+            case 4:
+                self.score += 1600 * (1.5**(self.level-1))
 
     def remove_lines(self):
         lines_to_remove = self.find_lines(self.locked_blocks)
@@ -196,20 +235,58 @@ class Game:
                 self.update_pos_above(line)
                 self.lines += 1
         
+            self.update_score(len(lines_to_remove))
+    
+    def __str__(self):
+        display = ""
+        for y in range(18):
+            for x in range(8):
+                if (x,y) in self.locked_blocks or (x,y) in self.current_falling.shape.calculate_pos_list(self.current_falling.pos):
+                    display = display + "▉▉"
+                else:
+                    display = display + "  "
+            
+            display = display + "\n"
+
+        display = display + "\n\n\nNEXT BLOCK\n\n"
+        next_shape = self.next_block.shape.get_rel_pos()
+        for i in range(4):
+            for j in range(4):
+                if (j-1,i-1) in next_shape:
+                    display = display + "▉▉"
+                else:
+                    display = display + "  "
+
+            display = display + "\n"
+
+            
+        display = display + f"\n\n\n SCORE        LINES\n\n{int(round(self.score))}         {self.lines}"
+
+        return display
+    
+
+
 
 
 
 game = Game()
 
 game.debug_update_locked_blocks([(6,13),(7,14),(2,14),(6,14),(3,15),(7,15),(0,15),(6,15),(2,15),(0,16),(7,16),(6,16),(2,16),(3,16),(7,17),(2,17),(3,17),(4,17),(0,17),(6,17)])
-game.init_block(Block((5,2),shapes_list[2]))
+game.init_block(Block((5,2),shapes_list[1]))
 #random.choice(shapes_list)
-game.current_falling.shape.rotate_anticlock()
-game.current_falling.shape.rotate_anticlock()
+game.current_falling.rotate_anticlock()
+game.current_falling.rotate_anticlock()
 
-
-
-for i in range(80):
+for i in range(500):
     game.update()
-    print(game.locked_blocks)
-    input()
+    print(game)
+    inp = input()
+
+    if inp == "a":
+        game.current_falling.move_left(game.locked_blocks)
+    if inp == "d":
+        game.current_falling.move_right(game.locked_blocks)
+    if inp == "q":
+        game.current_falling.rotate_anticlock()
+    if inp == "e":
+        game.current_falling.rotate_clock()
