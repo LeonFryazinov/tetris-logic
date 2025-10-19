@@ -1,0 +1,9 @@
+
+
+Next commit:
+- add the "hold" mechanic
+- make the UI a bit more presentable (find a way to expand sideways instead of down)
+
+Future commits:
+- real time.
+- get keyboard module working.

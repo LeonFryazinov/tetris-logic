@@ -61,6 +61,16 @@ class Block_Shapes:
         self.rot_amount = len(relPosList)
         self.rel_pos = relPosList
         self.current_shape = 0
+    @staticmethod
+    def NONE():
+        return Block_Shapes([])
+    def is_none(self):
+        if len(self.rel_pos) == 0:
+            #print(self.rot_amount)
+            return True
+        else:
+            #print("rot ammount: " + str(self.rot_amount))
+            return False
     def get_rel_pos(self):
         return self.rel_pos[self.current_shape]
     
@@ -83,11 +93,14 @@ shapes_list = [Block_Shapes([[(0,0),(1,0),(0,1),(1,1)]]),#2x2 block
 class Block:
     def __init__(self,init_pos,shape,col=(255,0,0)):
         self.pos = init_pos
+        self.init_pos = init_pos
         self.shape:Block_Shapes = shape
         self.col = col
         self.gravity = (0,1)
         self.locking_next_step = False
     
+    def reset_to_init(self):
+        self.pos = self.init_pos
 
     def colliding_after_grav(self,colliders_list):
         next_pos = sum_tuple(self.pos,self.gravity)
@@ -155,17 +168,34 @@ class Game:
         self.level = 1
         self.current_falling: Block
         self.next_block = self.generate_block()
+        self.hold = Block((-1,-1),Block_Shapes.NONE())
+        self.can_hold = True
     
     def update(self):
+        
         if self.current_falling.locking_next_step:
             self.falling_to_static(self.current_falling)
             self.current_falling = self.next_block
             self.next_block = self.generate_block()
             self.remove_lines()
+            self.can_hold = True
         else:
 
             self.current_falling.grav(self.locked_blocks)
             
+    def swap_hold(self):
+        
+        if self.hold.shape.is_none():
+            print(self.hold.shape.is_none())
+            
+            self.hold = self.current_falling
+            self.current_falling = self.next_block
+            self.next_block = self.generate_block()
+        else:
+            temp = self.hold
+            self.hold = self.current_falling
+            self.current_falling = temp
+            self.current_falling.reset_to_init()
 
     def generate_block(self):
         return Block((random.randint(2,5),2),random.choice(shapes_list))
@@ -258,9 +288,24 @@ class Game:
                     display = display + "  "
 
             display = display + "\n"
+        display = display + "\n\n\nHOLD\n\n"
+        
 
+
+            HOLD = self.hold.shape.get_rel_pos()
+
+            for i in range(4):
+                for j in range(4):
+                    if (j-1,i-1) in HOLD:
+                        display = display + "▉▉"
+                    else:
+                        display = display + "  "
+
+                display = display + "\n"
+        else:
+            display += "\n" * 5
             
-        display = display + f"\n\n\n SCORE        LINES\n\n{int(round(self.score))}         {self.lines}"
+        display = display + f"\n\n\n SCORE        \n\n  {int(round(self.score))}    \n\n LINES    \n\n {self.lines}"
 
         return display
     
@@ -273,6 +318,7 @@ game = Game()
 
 game.debug_update_locked_blocks([(6,13),(7,14),(2,14),(6,14),(3,15),(7,15),(0,15),(6,15),(2,15),(0,16),(7,16),(6,16),(2,16),(3,16),(7,17),(2,17),(3,17),(4,17),(0,17),(6,17)])
 game.init_block(Block((5,2),shapes_list[1]))
+game.hold =  game.generate_block() #debug
 #random.choice(shapes_list)
 game.current_falling.rotate_anticlock()
 game.current_falling.rotate_anticlock()
@@ -286,7 +332,7 @@ for i in range(500):
         game.current_falling.move_left(game.locked_blocks)
     if inp == "d":
         game.current_falling.move_right(game.locked_blocks)
-    if inp == "q":
-        game.current_falling.rotate_anticlock()
-    if inp == "e":
+    if inp == "w":
         game.current_falling.rotate_clock()
+    if inp == "e":
+        game.swap_hold()
