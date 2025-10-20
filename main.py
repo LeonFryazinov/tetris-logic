@@ -51,6 +51,24 @@ def sort_pos(pos_list):
 
         return sorted_join
 
+def join_text(a:str,b:str,x_offset=5,y_offset=0):
+    split_a = a.split("\n")
+    split_b = b.split("\n")
+    combined_string = ""
+    max_len_a = 0
+    for line in split_a:
+        if len(line) > max_len_a:
+            max_len_a = len(line)
+
+    for i in range(len(split_a)): #(len(split_a) if len(split_a) > len(split_b)+y_offset else len(split_b)+y_offset)
+        combined_string += split_a[i]
+        combined_string += " " * ((max_len_a-len(split_a[i]))+x_offset)
+        if i - y_offset >= 0 and i-y_offset < len(split_b):
+            combined_string += split_b[i-y_offset]
+        
+        combined_string += "\n"
+    
+    return combined_string
 
 
 
@@ -269,43 +287,67 @@ class Game:
     
     def __str__(self):
         display = ""
+        main_game_txt = ""
+        next_block_txt = ""
+        hold_txt = ""
+        score_txt = ""
         for y in range(18):
             for x in range(8):
                 if (x,y) in self.locked_blocks or (x,y) in self.current_falling.shape.calculate_pos_list(self.current_falling.pos):
-                    display = display + "▉▉"
+                    main_game_txt += "▉▉"
                 else:
-                    display = display + "  "
+                    main_game_txt += "  "
             
-            display = display + "\n"
+            main_game_txt += "\n"
 
-        display = display + "\n\n\nNEXT BLOCK\n\n"
+        next_block_txt += "NEXT BLOCK\n\n"
+        temp = self.next_block.shape.current_shape
+        self.next_block.shape.current_shape = 0
         next_shape = self.next_block.shape.get_rel_pos()
+        self.next_block.shape.current_shape = temp
         for i in range(4):
             for j in range(4):
                 if (j-1,i-1) in next_shape:
-                    display = display + "▉▉"
+                    next_block_txt += "▉▉"
                 else:
-                    display = display + "  "
+                   next_block_txt += "  "
 
-            display = display + "\n"
-        display = display + "\n\n\nHOLD\n\n"
+            next_block_txt += "\n"
+        
+        hold_txt += " HOLD\n\n"
         
 
-
+        if not self.hold.shape.is_none():
+            temp = self.hold.shape.current_shape
+            self.hold.shape.current_shape = 0
             HOLD = self.hold.shape.get_rel_pos()
-
+            self.hold.shape.current_shape = temp
+            print(self.hold.shape)
             for i in range(4):
                 for j in range(4):
                     if (j-1,i-1) in HOLD:
-                        display = display + "▉▉"
+                        hold_txt += "▉▉"
                     else:
-                        display = display + "  "
+                        hold_txt += "  "
 
-                display = display + "\n"
+                hold_txt += "\n"
         else:
-            display += "\n" * 5
+            hold_txt += "\n" * 5
             
-        display = display + f"\n\n\n SCORE        \n\n  {int(round(self.score))}    \n\n LINES    \n\n {self.lines}"
+        score_txt += join_text(f" SCORE        \n\n   {int(round(self.score))}",f" LINES    \n\n   {self.lines}",3,0)
+        top_right_txt = join_text(next_block_txt,hold_txt,3,0)
+        right_side = top_right_txt + ("\n" * 2) + score_txt
+
+        border = "|\n"*18
+        main_game_with_borders = join_text(border,join_text(main_game_txt,border,0,0),0,0)
+        display += "\n" *15
+
+
+        display += join_text(main_game_with_borders,right_side,10,3)
+
+
+
+        display += "\n" *5
 
         return display
     
@@ -318,12 +360,12 @@ game = Game()
 
 game.debug_update_locked_blocks([(6,13),(7,14),(2,14),(6,14),(3,15),(7,15),(0,15),(6,15),(2,15),(0,16),(7,16),(6,16),(2,16),(3,16),(7,17),(2,17),(3,17),(4,17),(0,17),(6,17)])
 game.init_block(Block((5,2),shapes_list[1]))
-game.hold =  game.generate_block() #debug
+game.hold = Block((-1,-1),Block_Shapes.NONE())
+ #debug
 #random.choice(shapes_list)
-game.current_falling.rotate_anticlock()
-game.current_falling.rotate_anticlock()
 
-for i in range(500):
+
+for i in range(1000):
     game.update()
     print(game)
     inp = input()
@@ -334,5 +376,6 @@ for i in range(500):
         game.current_falling.move_right(game.locked_blocks)
     if inp == "w":
         game.current_falling.rotate_clock()
+        print(game.current_falling.shape)
     if inp == "e":
         game.swap_hold()
