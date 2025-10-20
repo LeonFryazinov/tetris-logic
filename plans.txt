@@ -1,8 +1,8 @@
 
 
 Next commit:
-- add the "hold" mechanic
-- make the UI a bit more presentable (find a way to expand sideways instead of down)
+- implement the horizontal UI builder into main file
+
 
 Future commits:
 - real time.
