@@ -1,4 +1,6 @@
 import random
+import time
+import keyboard
 # limitations:
 # no "board" list allowed
 
@@ -92,6 +94,14 @@ class Block_Shapes:
     def get_rel_pos(self):
         return self.rel_pos[self.current_shape]
     
+    def is_colliding(self,pos,locked_pos):
+        for rel_pos in self.get_rel_pos():
+            if sum_tuple(pos,rel_pos) in locked_pos:
+                return True
+        
+        return False
+
+
     def calculate_pos_list(self,abs_pos):
         cell_pos = []
         for pos in self.rel_pos[self.current_shape]:
@@ -113,6 +123,7 @@ class Block:
         self.pos = init_pos
         self.init_pos = init_pos
         self.shape:Block_Shapes = shape
+        self.shape.current_shape = 0
         self.col = col
         self.gravity = (0,1)
         self.locking_next_step = False
@@ -148,19 +159,37 @@ class Block:
         if not self.collide_after_vect((1,0),col_list):
             self.pos = sum_tuple(self.pos,(1,0))
             self.locking_next_step = False
-    def rotate_clock(self):
+    def rotate_clock(self,locked_list):
         if self.shape.current_shape != self.shape.rot_amount-1:
-            self.locking_next_step = False
+            
             self.shape.current_shape += 1
+            if self.shape.is_colliding(self.pos,locked_list):
+                self.shape.current_shape -= 1
+            else:
+                self.locking_next_step = False
+
         else:
             self.shape.current_shape = 0
-    def rotate_anticlock(self):
-        if self.shape.current_shape != 0:
-            self.locking_next_step = False
+            if self.shape.is_colliding(self.pos,locked_list):
+                self.shape.current_shape = self.shape.rot_amount-1
+            else:
+                self.locking_next_step = False
+    def rotate_anticlock(self,locked_list):
 
+        if self.shape.current_shape != 0:
             self.shape.current_shape -= 1
+            if self.shape.is_colliding(self.pos,locked_list):
+                self.shape.current_shape += 1
+            else:
+                self.locking_next_step = False
+
+            
         else:
             self.shape.current_shape = self.shape.rot_amount - 1
+            if self.shape.is_colliding(self.pos,locked_list):
+                self.shape.current_shape = 0
+            else:
+                self.locking_next_step = False
 
     def grav(self,col_list):
         #check for collisions:
@@ -189,6 +218,21 @@ class Game:
         self.hold = Block((-1,-1),Block_Shapes.NONE())
         self.can_hold = True
     
+    def move_block_left(self):
+        self.current_falling.move_left(self.locked_blocks)
+    def move_block_right(self):
+        self.current_falling.move_right(self.locked_blocks)
+    def rotate_block(self,dir=1): # direction is either clockwise (represented by a 1) and anticlockwise (represented by a -1)
+        if dir != 1 and dir != -1:
+            print("CANT ROTATE AS NO DIRECTION GIVEN")
+            return -1
+        else:
+            match dir:
+                case 1:
+                    self.current_falling.rotate_clock(self.locked_blocks)
+                case -1:
+                    self.current_falling.rotate_anticlock(self.locked_blocks)
+
     def update(self):
         
         if self.current_falling.locking_next_step:
@@ -351,31 +395,94 @@ class Game:
 
         return display
     
+class keyboard_listener:
+    def __init__(self,listen) -> None:
+        self.listen_list = listen
+        self.held_down = []
+        self.just_down = []
+    
+    def update(self):
+        self.just_down.clear()
+        for key in self.listen_list:
+            if keyboard.is_pressed(key) and (not key in self.held_down):
+                self.just_down.append(key)
+                self.held_down.append(key)
+            elif (not keyboard.is_pressed(key)) and (key in self.held_down):
+                self.held_down.remove(key)
+    def key_just_pressed(self,key):
+        if key in self.just_down:
+            return True
+        else:
+            return False
 
 
 
 
 
 game = Game()
+key_listen = keyboard_listener(["W","A","S","D","E"])
 
-game.debug_update_locked_blocks([(6,13),(7,14),(2,14),(6,14),(3,15),(7,15),(0,15),(6,15),(2,15),(0,16),(7,16),(6,16),(2,16),(3,16),(7,17),(2,17),(3,17),(4,17),(0,17),(6,17)])
-game.init_block(Block((5,2),shapes_list[1]))
+game.debug_update_locked_blocks([(6,13),(7,14),(2,14),(6,14),(3,15),(7,15),(0,15),(6,15),(2,15),(0,16),(7,16),(6,16),(2,16),(3,16),(7,17),(2,17),(3,17),(4,17),(0,17),(6,17)]) # debug
+game.init_block(game.generate_block())
 game.hold = Block((-1,-1),Block_Shapes.NONE())
  #debug
 #random.choice(shapes_list)
 
+grav_time = 0.0
+fps = 30
+spf = 1/fps
+redraw_time = 0.0
+previous_time = time.time()
 
-for i in range(1000):
-    game.update()
-    print(game)
-    inp = input()
+while True:
+    
+    dt = time.time() - previous_time
+    previous_time = time.time()
 
-    if inp == "a":
-        game.current_falling.move_left(game.locked_blocks)
-    if inp == "d":
-        game.current_falling.move_right(game.locked_blocks)
-    if inp == "w":
-        game.current_falling.rotate_clock()
-        print(game.current_falling.shape)
-    if inp == "e":
-        game.swap_hold()
+    
+
+    redraw_time += dt
+    grav_time += dt
+
+    if redraw_time >= spf:
+        key_listen.update()
+        if key_listen.key_just_pressed("A"):
+            game.move_block_left()
+        if key_listen.key_just_pressed("D"):
+            game.move_block_right()
+        if key_listen.key_just_pressed("W"):
+            game.rotate_block()
+        if key_listen.key_just_pressed("E"):
+            game.swap_hold()
+
+
+        
+        
+        
+
+
+
+    
+    #print(dt)
+    #if grav_time >= 1:
+    #    game.update()
+    #    
+    #    grav_time = 0.0
+    
+
+
+
+
+#game.update()
+ #   print(game)
+  #  inp = input()
+#
+ #   if inp == "a":
+  #      game.current_falling.move_left(game.locked_blocks)
+   # if inp == "d":
+    #    game.current_falling.move_right(game.locked_blocks)
+    #if inp == "w":
+    #    game.current_falling.rotate_clock()
+    #    print(game.current_falling.shape)
+    #if inp == "e":
+    #    game.swap_hold()
