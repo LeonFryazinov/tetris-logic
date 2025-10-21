@@ -127,26 +127,32 @@ class Block:
         self.col = col
         self.gravity = (0,1)
         self.locking_next_step = False
+        
+
+        
+        
     
     def reset_to_init(self):
         self.pos = self.init_pos
 
     def colliding_after_grav(self,colliders_list):
         next_pos = sum_tuple(self.pos,self.gravity)
-        for collider in colliders_list:
-            for rel_pos in self.shape.get_rel_pos():
-                if compare_tuple(sum_tuple(rel_pos,next_pos),collider) or sum_tuple(next_pos,rel_pos)[1] == 18:
+        for rel_pos in self.shape.get_rel_pos():
 
-                    return True
+            if sum_tuple(rel_pos,next_pos) in colliders_list or sum_tuple(next_pos,rel_pos)[1] == 18:
+
+                return True
         
         return False
     def collide_after_vect(self,vect,colliders_list):
         next_pos = sum_tuple(self.pos,vect)
-        for collider in colliders_list:
-            for rel_pos in self.shape.get_rel_pos():
-                summed_next_pos = sum_tuple(rel_pos,next_pos)
-                if compare_tuple(summed_next_pos,collider) or summed_next_pos[0] == -1 or summed_next_pos[0] == 8:
-                    return True
+        for rel_pos in self.shape.get_rel_pos():
+            summed_next_pos = sum_tuple(rel_pos,next_pos)
+            if summed_next_pos[0] == -1 or summed_next_pos[0] == 8 or summed_next_pos[1] > 17:
+                return True              
+            if summed_next_pos in colliders_list:
+                return True
+            
         return False
     
     def move_left(self,col_list):
@@ -213,11 +219,18 @@ class Game:
         self.score = 0
         self.lines = 0
         self.level = 1
+        self.BREAK = False
         self.current_falling: Block
         self.next_block = self.generate_block()
         self.hold = Block((-1,-1),Block_Shapes.NONE())
         self.can_hold = True
     
+    def check_loss(self):
+        if self.current_falling.shape.is_colliding(self.current_falling.pos,self.locked_blocks):
+            return True
+        else:
+            return False
+
     def move_block_left(self):
         self.current_falling.move_left(self.locked_blocks)
     def move_block_right(self):
@@ -236,11 +249,7 @@ class Game:
     def update(self):
         
         if self.current_falling.locking_next_step:
-            self.falling_to_static(self.current_falling)
-            self.current_falling = self.next_block
-            self.next_block = self.generate_block()
-            self.remove_lines()
-            self.can_hold = True
+            self.lock_block()
         else:
 
             self.current_falling.grav(self.locked_blocks)
@@ -248,16 +257,20 @@ class Game:
     def swap_hold(self):
         
         if self.hold.shape.is_none():
-            print(self.hold.shape.is_none())
+            #print(self.hold.shape.is_none())
             
             self.hold = self.current_falling
             self.current_falling = self.next_block
             self.next_block = self.generate_block()
+
         else:
-            temp = self.hold
-            self.hold = self.current_falling
-            self.current_falling = temp
-            self.current_falling.reset_to_init()
+            if self.can_hold:
+                self.can_hold = False
+                temp = self.hold
+                self.hold = self.current_falling
+                self.current_falling = temp
+                self.current_falling.reset_to_init()
+                self.check_loss()
 
     def generate_block(self):
         return Block((random.randint(2,5),2),random.choice(shapes_list))
@@ -267,6 +280,34 @@ class Game:
 
     def debug_update_locked_blocks(self,new_list):
         self.locked_blocks = new_list
+    def lock_block(self):
+        self.falling_to_static(self.current_falling)
+        self.current_falling = self.next_block
+        self.next_block = self.generate_block()
+        self.remove_lines()
+        self.can_hold = True
+
+        if self.check_loss():
+            self.BREAK = True
+
+
+
+    def drop_block(self):
+        pos_list = self.current_falling.shape.get_rel_pos()
+        min_dist = 1000000000
+        for rel_pos in pos_list:
+            abs_pos = sum_tuple(self.current_falling.pos,rel_pos)
+            for i in range(18):
+                if self.current_falling.collide_after_vect((0,i),self.locked_blocks):
+                    if i-1 < min_dist:
+                        min_dist = i-1
+            
+        self.current_falling.pos = sum_tuple(self.current_falling.pos,(0,min_dist))
+        self.lock_block()
+        self.score += ((i-2)*5)
+
+
+
 
     def find_lines(self,pos_list):
         current_y = -1
@@ -312,13 +353,13 @@ class Game:
     def update_score(self,line_amount):
         match line_amount:
             case 1:
-                self.score += 100 * (1.5**(self.level-1))
+                self.score += 100 * (1.5*(self.level-1))
             case 2:
-                self.score += 300 * (1.5**(self.level-1))
+                self.score += 300 * (1.5*(self.level-1))
             case 3:
-                self.score += 1000 * (1.5**(self.level-1))
+                self.score += 1000 * (1.5*(self.level-1))
             case 4:
-                self.score += 1600 * (1.5**(self.level-1))
+                self.score += 1600 * (1.5*(self.level-1))
 
     def remove_lines(self):
         lines_to_remove = self.find_lines(self.locked_blocks)
@@ -366,7 +407,7 @@ class Game:
             self.hold.shape.current_shape = 0
             HOLD = self.hold.shape.get_rel_pos()
             self.hold.shape.current_shape = temp
-            print(self.hold.shape)
+            #print(self.hold.shape)
             for i in range(4):
                 for j in range(4):
                     if (j-1,i-1) in HOLD:
@@ -422,29 +463,30 @@ class keyboard_listener:
 game = Game()
 key_listen = keyboard_listener(["W","A","S","D","E"])
 
-game.debug_update_locked_blocks([(6,13),(7,14),(2,14),(6,14),(3,15),(7,15),(0,15),(6,15),(2,15),(0,16),(7,16),(6,16),(2,16),(3,16),(7,17),(2,17),(3,17),(4,17),(0,17),(6,17)]) # debug
+#game.debug_update_locked_blocks([(6,13),(7,14),(2,14),(6,14),(3,15),(7,15),(0,15),(6,15),(2,15),(0,16),(7,16),(6,16),(2,16),(3,16),(7,17),(2,17),(3,17),(4,17),(0,17),(6,17)]) # debug
 game.init_block(game.generate_block())
 game.hold = Block((-1,-1),Block_Shapes.NONE())
  #debug
 #random.choice(shapes_list)
 
 grav_time = 0.0
-fps = 30
+fps = 5
 spf = 1/fps
 redraw_time = 0.0
+key_update_time = 0.0
 previous_time = time.time()
 
 while True:
     
     dt = time.time() - previous_time
     previous_time = time.time()
-
     
-
     redraw_time += dt
     grav_time += dt
+    key_update_time += dt
 
-    if redraw_time >= spf:
+    if key_update_time >= spf//2:
+        
         key_listen.update()
         if key_listen.key_just_pressed("A"):
             game.move_block_left()
@@ -452,37 +494,23 @@ while True:
             game.move_block_right()
         if key_listen.key_just_pressed("W"):
             game.rotate_block()
+        if key_listen.key_just_pressed("S"):
+            game.drop_block() # send current block down
         if key_listen.key_just_pressed("E"):
             game.swap_hold()
+        key_update_time = 0.0
 
-
-        
-        
-        
-
-
-
+    if redraw_time >= spf:
+        print(game)
+        redraw_time = 0.0
+        if grav_time >= 0.5:
+            game.update()
+            grav_time = 0.0
     
-    #print(dt)
-    #if grav_time >= 1:
-    #    game.update()
-    #    
-    #    grav_time = 0.0
-    
+    if game.BREAK:
+        print(game)
+        break
 
 
 
-
-#game.update()
- #   print(game)
-  #  inp = input()
-#
- #   if inp == "a":
-  #      game.current_falling.move_left(game.locked_blocks)
-   # if inp == "d":
-    #    game.current_falling.move_right(game.locked_blocks)
-    #if inp == "w":
-    #    game.current_falling.rotate_clock()
-    #    print(game.current_falling.shape)
-    #if inp == "e":
-    #    game.swap_hold()
+print(f"You lost\n Your Final score: {game.score}")
