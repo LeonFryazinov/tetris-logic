@@ -1,9 +1,5 @@
 
-
-Next commit:
-- implement the horizontal UI builder into main file
-
-
-Future commits:
-- real time.
-- get keyboard module working.
+Future:
+- pause button?
+- increasing levels
+- arrow key compatibility

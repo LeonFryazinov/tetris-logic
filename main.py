@@ -96,8 +96,12 @@ class Block_Shapes:
     
     def is_colliding(self,pos,locked_pos):
         for rel_pos in self.get_rel_pos():
-            if sum_tuple(pos,rel_pos) in locked_pos:
+            new_pos = sum_tuple(pos,rel_pos)
+            if new_pos in locked_pos:
                 return True
+            if new_pos[0] == -1 or new_pos[0] == 8 or new_pos[1] > 17:
+                return True
+            
         
         return False
 
@@ -126,34 +130,16 @@ class Block:
         self.shape.current_shape = 0
         self.col = col
         self.gravity = (0,1)
-        self.locking_next_step = False
-        
-
-        
-        
-    
+        self.locking_next_step = False 
     def reset_to_init(self):
         self.pos = self.init_pos
 
-    def colliding_after_grav(self,colliders_list):
-        next_pos = sum_tuple(self.pos,self.gravity)
-        for rel_pos in self.shape.get_rel_pos():
-
-            if sum_tuple(rel_pos,next_pos) in colliders_list or sum_tuple(next_pos,rel_pos)[1] == 18:
-
-                return True
-        
-        return False
     def collide_after_vect(self,vect,colliders_list):
         next_pos = sum_tuple(self.pos,vect)
-        for rel_pos in self.shape.get_rel_pos():
-            summed_next_pos = sum_tuple(rel_pos,next_pos)
-            if summed_next_pos[0] == -1 or summed_next_pos[0] == 8 or summed_next_pos[1] > 17:
-                return True              
-            if summed_next_pos in colliders_list:
-                return True
-            
-        return False
+        if self.shape.is_colliding(next_pos,colliders_list):
+            return True
+        else: 
+            return False
     
     def move_left(self,col_list):
         if not self.collide_after_vect((-1,0),col_list):
@@ -200,7 +186,7 @@ class Block:
     def grav(self,col_list):
         #check for collisions:
 
-        if not self.colliding_after_grav(col_list):
+        if not self.collide_after_vect(self.gravity,col_list):
             self.pos = sum_tuple(self.pos,self.gravity)
             
         else:
@@ -513,4 +499,5 @@ while True:
 
 
 
-print(f"You lost\n Your Final score: {game.score}")
+print(f"You lost\n Your Final score: {int(game.score)}")
+input()
