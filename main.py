@@ -1,6 +1,7 @@
 import random
 import time
 import keyboard
+import os
 # limitations:
 # no "board" list allowed
 
@@ -449,6 +450,8 @@ class keyboard_listener:
 game = Game()
 key_listen = keyboard_listener(["W","A","S","D","E"])
 
+
+
 #game.debug_update_locked_blocks([(6,13),(7,14),(2,14),(6,14),(3,15),(7,15),(0,15),(6,15),(2,15),(0,16),(7,16),(6,16),(2,16),(3,16),(7,17),(2,17),(3,17),(4,17),(0,17),(6,17)]) # debug
 game.init_block(game.generate_block())
 game.hold = Block((-1,-1),Block_Shapes.NONE())
@@ -487,6 +490,7 @@ while True:
         key_update_time = 0.0
 
     if redraw_time >= spf:
+        #os.system("cls" if os.name == "nt" else "clear")
         print(game)
         redraw_time = 0.0
         if grav_time >= 0.5:
